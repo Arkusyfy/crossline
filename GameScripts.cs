@@ -1,12 +1,12 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using UnityEditor;
 using UnityEngine;
 
 public class GameScripts : MonoBehaviour
 {
+    private int depth = 0;
     private readonly List<string> lines = new List<string>();
 
     private bool doDrugieSetup = true;
@@ -16,10 +16,7 @@ public class GameScripts : MonoBehaviour
     private double globalTurnCounter;
     private bool isFirstTurn = true;
 
-    
-    private int secondLegitBoards = 0;
 
-    
     // private GameObject firstPlayerLines, secondPlayerLines;
     [SerializeField] private GameObject linePrefFirst, linePrefSecond, linesContainer;
     private double localBFactor;
@@ -29,6 +26,9 @@ public class GameScripts : MonoBehaviour
 
     public List<GameObject> pointsArr;
     private Dictionary<GameObject, GameObject> randomBoards = new Dictionary<GameObject, GameObject>();
+
+
+    private int secondLegitBoards;
 
     private bool validTurn = true;
 
@@ -65,7 +65,10 @@ public class GameScripts : MonoBehaviour
             Debug.Log("Global Branching Factor: " + globalBFactor + "\r\nLiczba prób: " + loopCount);
             Debug.Log("Średnia ilość ruchów: " + globalTurnCounter +
                       "\r\nGłębokość drzewa: " + Mathf.Pow((float) globalBFactor, (float) globalTurnCounter));
+            #if UNITY_EDITOR
             if (EditorApplication.isPlaying) EditorApplication.isPlaying = false;
+            #endif
+
             Application.Quit();
         }
     }
@@ -79,15 +82,18 @@ public class GameScripts : MonoBehaviour
             ResetGame();
         }
         else
-        {   
-            Debug.Log("Ilość poprawnych planszy: "+secondLegitBoards);
+        {
+            Debug.Log("Ilość poprawnych planszy: " + secondLegitBoards);
             Debug.Log("Liczba prób: " + loopCount);
+#if UNITY_EDITOR
+
             if (EditorApplication.isPlaying) EditorApplication.isPlaying = false;
+            #endif
             Application.Quit();
         }
     }
 
-    
+
     private IEnumerator resDelat()
     {
         yield return new WaitForSeconds(7.5f);
@@ -128,7 +134,7 @@ public class GameScripts : MonoBehaviour
         }
         else
         {
-            bool isLegitBoard = true;
+            var isLegitBoard = true;
             foreach (var keyValuePair in randomBoards)
             {
                 if (isFirstTurn)
@@ -139,10 +145,10 @@ public class GameScripts : MonoBehaviour
                     continue;
                 }
 
-                
+
                 if (LinesInFront(keyValuePair.Key, keyValuePair.Value) == 1)
                 {
-                    if(!lines.Contains(keyValuePair.Key.name + keyValuePair.Value.name))
+                    if (!lines.Contains(keyValuePair.Key.name + keyValuePair.Value.name))
                     {
                         DrawLine(keyValuePair.Key, keyValuePair.Value);
                         firstPlayerTurn = !firstPlayerTurn;
@@ -152,26 +158,20 @@ public class GameScripts : MonoBehaviour
                 {
                     isLegitBoard = false;
                 }
-                
             }
 
             if (isLegitBoard)
-            {
                 secondLegitBoards += 1;
-            }
             else
-            {
                 Debug.Log("nielegitne");
-            }
             GameEndDwa();
-            
         }
 
 
         // Debug.Break();
     }
 
-    
+
     private void SetupDrugie()
     {
         var localPoints = new List<GameObject>(pointsArr);
@@ -193,7 +193,6 @@ public class GameScripts : MonoBehaviour
             var randomMove = Random.Range(0, 8);
             if (randomMove != 7)
                 randomBoards.Add(localPoint, validPoints[randomMove]);
-
         }
 
         var normalizedBoards = new Dictionary<GameObject, GameObject>();
@@ -207,12 +206,10 @@ public class GameScripts : MonoBehaviour
                     shouldAdd = false;
                     continue;
                 }
-                if (keyValuePair.Value.ToString() + keyValuePair.Key.ToString() ==
-                    normalizedBoard.Key.ToString() + normalizedBoard.Value.ToString())
-                {
+
+                if (keyValuePair.Value + keyValuePair.Key.ToString() ==
+                    normalizedBoard.Key + normalizedBoard.Value.ToString())
                     shouldAdd = false;
-                    continue;
-                }
             }
 
             if (shouldAdd) normalizedBoards.Add(keyValuePair.Key, keyValuePair.Value);
@@ -221,12 +218,9 @@ public class GameScripts : MonoBehaviour
         randomBoards.Clear();
         randomBoards = new Dictionary<GameObject, GameObject>(normalizedBoards);
         var rand = new System.Random();
-        
+
         randomBoards = randomBoards.OrderBy(x => rand.Next())
             .ToDictionary(item => item.Key, item => item.Value);
-
-        
-        
     }
 
     private double CountPossibleMoves()
@@ -256,6 +250,148 @@ public class GameScripts : MonoBehaviour
         }
 
         return validMovesCnt / 2;
+    }
+
+
+    private Dictionary<GameObject, GameObject> PosMovesFromPoint(GameObject localPoint)
+    {
+        var validMovesArr = new Dictionary<GameObject, GameObject>();
+        var validMoves = 0;
+        var validPoints = new List<GameObject>(pointsArr);
+        var pointIndex = validPoints.IndexOf(localPoint);
+
+        var pointsCount = validPoints.Count;
+        var invalidPoints = new GameObject[2];
+        invalidPoints[1] = validPoints[(pointIndex + 1) % pointsCount];
+        invalidPoints[0] = validPoints[(pointsCount + (pointIndex - 1) % pointsCount) % pointsCount];
+
+        validPoints.Remove(invalidPoints[1]);
+        validPoints.Remove(invalidPoints[0]);
+        validPoints.Remove(localPoint);
+        if (isFirstTurn)
+        {
+            foreach (var validPoint in validPoints) validMovesArr.Add(localPoint, validPoint);
+        
+            return validMovesArr;
+        }
+
+        foreach (var validPoint in validPoints)
+        {
+            var possibleM = LinesInFront(localPoint, validPoint);
+            if (possibleM == 1)
+            {
+                validMoves += 1;
+                validMovesArr.Add(validPoint, localPoint);
+                
+            }
+        }
+
+        return validMovesArr;
+    }
+
+    private void MiniMaxRoutine()
+    {
+        var possibleMoves = new List<Dictionary<GameObject, GameObject>>();
+        foreach (var o in pointsArr) possibleMoves.Add(PosMovesFromPoint(o));
+        var movesValues = new List<double>();
+        double allMoves = 0;
+        foreach (var possibleMove in possibleMoves)
+        {
+            movesValues.Add(possibleMove.Count);
+            allMoves += possibleMove.Count;
+        }
+    }
+
+    private List<double> GetMovesValues(Dictionary<GameObject, GameObject> node)
+    {
+        var movesValues = new List<double>();
+        foreach (var keyValuePair in node)
+        {
+            DrawLine(keyValuePair.Value,keyValuePair.Key);
+            movesValues.Add(PosMovesFromPoint(keyValuePair.Key).Count);
+            PopLine();
+        }
+
+        return movesValues;
+    }
+
+    private double minimax(Dictionary<GameObject, GameObject> node, int depth, bool maximizingPlayer)
+    {
+        if (node.Count == 0) return 0;
+        if (depth == 0)
+        {
+            var movesValues = GetMovesValues(node);
+            var allMoves = node.Count;
+
+            for (var i = 0; i < movesValues.Count; i++)
+            {
+                var movesValue = movesValues[i];
+                if (movesValue % 2 == 0)
+                    movesValues[i] = movesValue / allMoves;
+                else
+                    movesValues[i] = allMoves / movesValue;
+            }
+
+            if (movesValues.Count == 1)
+            {
+                if (movesValues[0] % 2 == 0)
+                    movesValues[0] = -1;
+                else
+                    movesValues[0] = 1;
+            }
+
+            return movesValues.Sum();
+        }
+
+
+        if (firstPlayerTurn)
+        {
+            var value = double.MinValue;
+
+            foreach (var keyValuePair in node)
+            {
+                DrawLine(keyValuePair.Key, keyValuePair.Value);
+                value = max(value, minimax(PosMovesFromPoint(keyValuePair.Value), depth - 1, false));
+                PopLine();
+            }
+
+            return value;
+        }
+        else
+        {
+            var value = double.MaxValue;
+            foreach (var keyValuePair in node)
+            {
+                DrawLine(keyValuePair.Key, keyValuePair.Value);
+                value = min(value, minimax(PosMovesFromPoint(keyValuePair.Value), depth - 1, true));
+                PopLine();
+            }
+
+            return value;
+        }
+    }
+
+    private double max(double value, double child)
+    {
+        if (value > child)
+            return value;
+        return child;
+    }
+
+    private double min(double value, double child)
+    {
+        if (value < child)
+            return value;
+        return child;
+    }
+
+    private void PopLine()
+    {
+        lines.RemoveAt(lines.Count - 1);
+        lines.RemoveAt(lines.Count - 1);
+
+        DestroyImmediate(linesContainer.transform.GetChild(linesContainer.transform.childCount - 1).gameObject);
+
     }
 
     private void DrawLine(GameObject point, GameObject connectToPoint)
@@ -290,11 +426,18 @@ public class GameScripts : MonoBehaviour
         // Thread.Sleep(1000);
     }
 
+    private void moveValuesArr()
+    {
+        var localPoints = new List<GameObject>(pointsArr);
+
+        foreach (var localPoint in localPoints) CheckPossibleLines();
+    }
+
     public bool CheckPossibleLines()
     {
         var localPoints = new List<GameObject>(pointsArr);
-        do
-        {
+
+        
             var pointsCount = localPoints.Count;
             var randomIndex = Random.Range(0, pointsCount);
             var validPoints = new List<GameObject>(localPoints);
@@ -313,37 +456,44 @@ public class GameScripts : MonoBehaviour
             validPoints.Remove(invalidPoints[0]);
             validPoints.Remove(point);
 
-
-            while (validPoints.Count > 0)
+            if (isFirstTurn)
             {
                 var connectToPointIndex = Random.Range(0, validPoints.Count);
                 var connectToPoint = validPoints[connectToPointIndex];
-                if (isFirstTurn)
-                {
-                    isFirstTurn = false;
-                    DrawLine(point, connectToPoint);
-                    firstPlayerTurn = false;
-                    return true;
-                }
-
-                if (LinesInFront(point, connectToPoint) == 1 &&
-                    !lines.Contains(point.name + connectToPoint.name))
-                {
-                    DrawLine(point, connectToPoint);
-                    firstPlayerTurn = !firstPlayerTurn;
-                    return true;
-                }
-
-
-                validPoints.Remove(connectToPoint);
+                isFirstTurn = false;
+                DrawLine(point, connectToPoint);
+                firstPlayerTurn = false;
+                return true;
             }
 
+            var movesValues = new List<double>();
+            var movesArr = new Dictionary<GameObject, GameObject>();
+            GameObject from, to;
+            from = to = null;
+            var _val = double.MinValue;
 
-            localPoints.Remove(point);
-            // Debug.Log("Origin: " + point.name + ", Desired: " + connectToPoint.name);
-        } while (localPoints.Count > 0);
+            foreach (var validPoint in validPoints)
+            {
+                var posMoves = PosMovesFromPoint(validPoint);
+                foreach (var keyValuePair in posMoves)
+                    if (_val < minimax(PosMovesFromPoint(keyValuePair.Value), depth, true))
+                    {
+                        _val = minimax(PosMovesFromPoint(keyValuePair.Value),depth , true);
+                        to = keyValuePair.Key;
+                        from = keyValuePair.Value;
+                    }
+            }
+            firstPlayerTurn = !firstPlayerTurn;
 
-        return false;
+            if (to != null)
+            {
+                DrawLine(from, to);
+                return true;
+            }
+
+            CountPossibleMoves();
+            return false;
+        
     }
 
     private int LinesInFront(GameObject origin, GameObject target)
