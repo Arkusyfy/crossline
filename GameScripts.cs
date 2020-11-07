@@ -6,8 +6,8 @@ using UnityEngine;
 
 public class GameScripts : MonoBehaviour
 {
-    private readonly List<string> lines = new List<string>();
     private readonly int depth = 0;
+    private readonly List<string> lines = new List<string>();
 
     private bool doDrugieSetup = true;
     private int drewCount;
@@ -345,6 +345,79 @@ public class GameScripts : MonoBehaviour
         return double.MaxValue;
     }
 
+    private double TerminalNodeNegamax(int sign)
+    {
+        if (sign == 1) return double.MinValue;
+        return double.MaxValue;
+    }
+
+    private double NegaMax(Dictionary<GameObject, GameObject> node, int depth, int sign = 1)
+    {
+        if (node.Count == 0) return TerminalNodeNegamax(sign);
+        if (depth == 0)
+            return sign * NodeValue(node);
+        var value = double.MinValue;
+        foreach (var keyValuePair in node)
+        {
+            DrawLine(keyValuePair.Key, keyValuePair.Value);
+            value = max(value, -NegaMax(PosMovesFromPoint(keyValuePair.Value), depth - 1, -sign));
+            PopLine();
+        }
+
+        return value;
+    }
+
+
+    private double AlphaBeta(Dictionary<GameObject, GameObject> node, int depth, bool maximizingPlayer,
+        double alpha = double.MinValue,
+        double beta = double.MaxValue)
+    {
+        if (node.Count == 0) return TerminalNode(maximizingPlayer);
+        if (depth == 0)
+            return NodeValue(node);
+        if (maximizingPlayer)
+        {
+            foreach (var keyValuePair in node)
+            {
+                DrawLine(keyValuePair.Key, keyValuePair.Value);
+                alpha = max(alpha, AlphaBeta(PosMovesFromPoint(keyValuePair.Value), depth - 1, false, alpha, beta));
+                PopLine();
+                if (alpha >= beta) return beta;
+            }
+
+            return alpha;
+        }
+
+        foreach (var keyValuePair in node)
+        {
+            DrawLine(keyValuePair.Key, keyValuePair.Value);
+            beta = min(beta, AlphaBeta(PosMovesFromPoint(keyValuePair.Value), depth - 1, true, alpha, beta));
+            PopLine();
+            if (alpha >= beta) return alpha;
+        }
+
+        return beta;
+    }
+
+    private double ABNegaMax(Dictionary<GameObject, GameObject> node, int depth, double alpha = double.MinValue,
+        double beta = double.MaxValue, int sign = 1)
+    {
+        if (node.Count == 0) return TerminalNodeNegamax(sign);
+        if (depth == 0)
+            return sign * NodeValue(node);
+        foreach (var keyValuePair in node)
+        {
+            DrawLine(keyValuePair.Key, keyValuePair.Value);
+
+            alpha = max(alpha, -ABNegaMax(PosMovesFromPoint(keyValuePair.Value), depth - 1, -beta, -alpha, -sign));
+            PopLine();
+
+            if (alpha >= beta) return alpha;
+        }
+
+        return alpha;
+    }
+
     private double minimax(Dictionary<GameObject, GameObject> node, int depth, bool maximizingPlayer)
     {
         if (node.Count == 0) return TerminalNode(maximizingPlayer);
@@ -440,7 +513,7 @@ public class GameScripts : MonoBehaviour
         foreach (var localPoint in localPoints) CheckPossibleLines();
     }
 
-    public bool CheckPossibleLines()
+    private bool CheckPossibleLines()
     {
         var localPoints = new List<GameObject>(pointsArr);
 
