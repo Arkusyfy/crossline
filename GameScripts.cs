@@ -6,8 +6,8 @@ using UnityEngine;
 
 public class GameScripts : MonoBehaviour
 {
-    private int depth = 0;
     private readonly List<string> lines = new List<string>();
+    private readonly int depth = 0;
 
     private bool doDrugieSetup = true;
     private int drewCount;
@@ -65,9 +65,9 @@ public class GameScripts : MonoBehaviour
             Debug.Log("Global Branching Factor: " + globalBFactor + "\r\nLiczba prób: " + loopCount);
             Debug.Log("Średnia ilość ruchów: " + globalTurnCounter +
                       "\r\nGłębokość drzewa: " + Mathf.Pow((float) globalBFactor, (float) globalTurnCounter));
-            #if UNITY_EDITOR
+#if UNITY_EDITOR
             if (EditorApplication.isPlaying) EditorApplication.isPlaying = false;
-            #endif
+#endif
 
             Application.Quit();
         }
@@ -88,7 +88,7 @@ public class GameScripts : MonoBehaviour
 #if UNITY_EDITOR
 
             if (EditorApplication.isPlaying) EditorApplication.isPlaying = false;
-            #endif
+#endif
             Application.Quit();
         }
     }
@@ -271,7 +271,7 @@ public class GameScripts : MonoBehaviour
         if (isFirstTurn)
         {
             foreach (var validPoint in validPoints) validMovesArr.Add(localPoint, validPoint);
-        
+
             return validMovesArr;
         }
 
@@ -282,7 +282,6 @@ public class GameScripts : MonoBehaviour
             {
                 validMoves += 1;
                 validMovesArr.Add(validPoint, localPoint);
-                
             }
         }
 
@@ -307,7 +306,7 @@ public class GameScripts : MonoBehaviour
         var movesValues = new List<double>();
         foreach (var keyValuePair in node)
         {
-            DrawLine(keyValuePair.Value,keyValuePair.Key);
+            DrawLine(keyValuePair.Value, keyValuePair.Key);
             movesValues.Add(PosMovesFromPoint(keyValuePair.Key).Count);
             PopLine();
         }
@@ -315,33 +314,42 @@ public class GameScripts : MonoBehaviour
         return movesValues;
     }
 
+    private double NodeValue(Dictionary<GameObject, GameObject> node)
+    {
+        var movesValues = GetMovesValues(node);
+        var allMoves = node.Count;
+
+        for (var i = 0; i < movesValues.Count; i++)
+        {
+            var movesValue = movesValues[i];
+            if (movesValue % 2 == 0)
+                movesValues[i] = movesValue / allMoves;
+            else
+                movesValues[i] = allMoves / movesValue;
+        }
+
+        if (movesValues.Count == 1)
+        {
+            if (movesValues[0] % 2 == 0)
+                movesValues[0] = -1;
+            else
+                movesValues[0] = 1;
+        }
+
+        return movesValues.Sum();
+    }
+
+    private double TerminalNode(bool maximizing)
+    {
+        if (maximizing) return double.MinValue;
+        return double.MaxValue;
+    }
+
     private double minimax(Dictionary<GameObject, GameObject> node, int depth, bool maximizingPlayer)
     {
-        if (node.Count == 0) return 0;
+        if (node.Count == 0) return TerminalNode(maximizingPlayer);
         if (depth == 0)
-        {
-            var movesValues = GetMovesValues(node);
-            var allMoves = node.Count;
-
-            for (var i = 0; i < movesValues.Count; i++)
-            {
-                var movesValue = movesValues[i];
-                if (movesValue % 2 == 0)
-                    movesValues[i] = movesValue / allMoves;
-                else
-                    movesValues[i] = allMoves / movesValue;
-            }
-
-            if (movesValues.Count == 1)
-            {
-                if (movesValues[0] % 2 == 0)
-                    movesValues[0] = -1;
-                else
-                    movesValues[0] = 1;
-            }
-
-            return movesValues.Sum();
-        }
+            return NodeValue(node);
 
 
         if (firstPlayerTurn)
@@ -391,7 +399,6 @@ public class GameScripts : MonoBehaviour
         lines.RemoveAt(lines.Count - 1);
 
         DestroyImmediate(linesContainer.transform.GetChild(linesContainer.transform.childCount - 1).gameObject);
-
     }
 
     private void DrawLine(GameObject point, GameObject connectToPoint)
@@ -437,63 +444,63 @@ public class GameScripts : MonoBehaviour
     {
         var localPoints = new List<GameObject>(pointsArr);
 
-        
-            var pointsCount = localPoints.Count;
-            var randomIndex = Random.Range(0, pointsCount);
-            var validPoints = new List<GameObject>(localPoints);
-            var point = localPoints[randomIndex];
 
-            var invalidPoints = new GameObject[2];
-            invalidPoints[1] = validPoints[(randomIndex + 1) % pointsCount];
-            invalidPoints[0] = validPoints[(pointsCount + (randomIndex - 1) % pointsCount) % pointsCount];
+        var pointsCount = localPoints.Count;
+        var randomIndex = Random.Range(0, pointsCount);
+        var validPoints = new List<GameObject>(localPoints);
+        var point = localPoints[randomIndex];
 
-            // if (invalidPoints[0] == null || invalidPoints[1] == null)
-            // {
-            //     localPoints.Remove(point);
-            // }
+        var invalidPoints = new GameObject[2];
+        invalidPoints[1] = validPoints[(randomIndex + 1) % pointsCount];
+        invalidPoints[0] = validPoints[(pointsCount + (randomIndex - 1) % pointsCount) % pointsCount];
 
-            validPoints.Remove(invalidPoints[1]);
-            validPoints.Remove(invalidPoints[0]);
-            validPoints.Remove(point);
+        // if (invalidPoints[0] == null || invalidPoints[1] == null)
+        // {
+        //     localPoints.Remove(point);
+        // }
 
-            if (isFirstTurn)
-            {
-                var connectToPointIndex = Random.Range(0, validPoints.Count);
-                var connectToPoint = validPoints[connectToPointIndex];
-                isFirstTurn = false;
-                DrawLine(point, connectToPoint);
-                firstPlayerTurn = false;
-                return true;
-            }
+        validPoints.Remove(invalidPoints[1]);
+        validPoints.Remove(invalidPoints[0]);
+        validPoints.Remove(point);
 
-            var movesValues = new List<double>();
-            var movesArr = new Dictionary<GameObject, GameObject>();
-            GameObject from, to;
-            from = to = null;
-            var _val = double.MinValue;
+        if (isFirstTurn)
+        {
+            var connectToPointIndex = Random.Range(0, validPoints.Count);
+            var connectToPoint = validPoints[connectToPointIndex];
+            isFirstTurn = false;
+            DrawLine(point, connectToPoint);
+            firstPlayerTurn = false;
+            return true;
+        }
 
-            foreach (var validPoint in validPoints)
-            {
-                var posMoves = PosMovesFromPoint(validPoint);
-                foreach (var keyValuePair in posMoves)
-                    if (_val < minimax(PosMovesFromPoint(keyValuePair.Value), depth, true))
-                    {
-                        _val = minimax(PosMovesFromPoint(keyValuePair.Value),depth , true);
-                        to = keyValuePair.Key;
-                        from = keyValuePair.Value;
-                    }
-            }
-            firstPlayerTurn = !firstPlayerTurn;
+        var movesValues = new List<double>();
+        var movesArr = new Dictionary<GameObject, GameObject>();
+        GameObject from, to;
+        from = to = null;
+        var _val = double.MinValue;
 
-            if (to != null)
-            {
-                DrawLine(from, to);
-                return true;
-            }
+        foreach (var validPoint in validPoints)
+        {
+            var posMoves = PosMovesFromPoint(validPoint);
+            foreach (var keyValuePair in posMoves)
+                if (_val < minimax(PosMovesFromPoint(keyValuePair.Value), depth, true))
+                {
+                    _val = minimax(PosMovesFromPoint(keyValuePair.Value), depth, true);
+                    to = keyValuePair.Key;
+                    from = keyValuePair.Value;
+                }
+        }
 
-            CountPossibleMoves();
-            return false;
-        
+        firstPlayerTurn = !firstPlayerTurn;
+
+        if (to != null)
+        {
+            DrawLine(from, to);
+            return true;
+        }
+
+        CountPossibleMoves();
+        return false;
     }
 
     private int LinesInFront(GameObject origin, GameObject target)
