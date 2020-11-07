@@ -352,7 +352,7 @@ public class GameScripts : MonoBehaviour
             return NodeValue(node);
 
 
-        if (firstPlayerTurn)
+        if (maximizingPlayer)
         {
             var value = double.MinValue;
 
