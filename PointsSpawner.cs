@@ -25,7 +25,7 @@ public class PointsSpawner : MonoBehaviour
             point.transform.LookAt(Vector3.zero);
             // point.transform.Translate(new Vector3(0, point.transform.localScale.y/2),0);
             point.transform.parent = parent.transform;
-            point.name = "Point" + i;
+            point.name =  i.ToString();
             pointsArr.Add(point);
         }
 

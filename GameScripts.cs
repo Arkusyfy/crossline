@@ -1,14 +1,22 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
+using UnityEditor.UIElements;
 using UnityEngine;
-
+using Random = UnityEngine.Random;
+using Rand = System.Random;
 public class GameScripts : MonoBehaviour
 {
     private readonly int depth = 0;
     private readonly List<string> lines = new List<string>();
 
+    private uint[] zobristKey = new uint[10*7];
+    private uint zHash;
+    
+    
+    
     private bool doDrugieSetup = true;
     private int drewCount;
     private bool firstPlayerTurn = true;
@@ -35,10 +43,78 @@ public class GameScripts : MonoBehaviour
     [SerializeField] private bool zadaniePierwsze = true;
 
     // Start is called before the first frame update
+    void RandomizeZorbist()
+    {
+        for (var i = 0; i < zobristKey.Length; i++)
+        {
+            zobristKey[i] = GetRandomUInt();
+        }
+    }
+
+    Rand rand = new Rand();
+
+    private Dictionary<uint, double> hashboards = new Dictionary<uint, double>();
+    private uint Hashboard()
+    {
+        uint result = 0;
+        for (int i = 0; i < 10; i++)
+        {
+            // if occupied
+            result ^= zobristKey[i * 7];
+        }
+        
+        foreach (var o in pointsArr)
+        {
+            foreach (var m in pointsArr)
+            {
+                if (lines.Contains(o.name + m.name))
+                {
+                    int parsedO = Int32.Parse(o.name);
+                    int parsedM = Int32.Parse(m.name);
+                    if (parsedM < parsedO)
+                    {
+                        if (parsedO == 9)
+                        {
+                            result ^= zobristKey[parsedO * 7 + parsedM-1];
+                        }
+                        else
+                        {
+                            result ^= zobristKey[parsedO * 7 + parsedM];
+                        }
+                    }
+                    else
+                    {
+                        if (parsedO == 0)
+                        {
+                            result ^= zobristKey[parsedO * 7 + parsedM-2  ];
+                            
+                        }
+                        else
+                        {
+                            result ^= zobristKey[parsedO * 7 + parsedM-3  ];
+                        }
+                    }
+                }
+
+            }
+        }
+
+
+        return result;
+    }
+    
+    public uint GetRandomUInt()
+    {
+        var buffer = new byte[sizeof(uint)];
+        rand.NextBytes(buffer);
+        return BitConverter.ToUInt32(buffer, 0);
+    }
     private void Start()
+    
     {
         loopCount = loopCounter;
         validTurn = true;
+        RandomizeZorbist();
     }
 
     // Update is called once per frame
@@ -422,8 +498,19 @@ public class GameScripts : MonoBehaviour
     {
         if (node.Count == 0) return TerminalNode(maximizingPlayer);
         if (depth == 0)
-            return NodeValue(node);
+        {
 
+            double thisval =  NodeValue(node);
+            hashboards.Add(Hashboard(),thisval);
+            return thisval;
+        }
+
+
+        uint thisBoard = Hashboard();
+        if (hashboards.ContainsKey(thisBoard))
+        {
+            return hashboards[thisBoard];
+        }
 
         if (maximizingPlayer)
         {
