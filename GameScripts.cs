@@ -115,6 +115,7 @@ public class GameScripts : MonoBehaviour
         loopCount = loopCounter;
         validTurn = true;
         RandomizeZorbist();
+
     }
 
     // Update is called once per frame
@@ -494,6 +495,261 @@ public class GameScripts : MonoBehaviour
         return alpha;
     }
 
+
+    
+    
+    public class LineTuple<T1, T2>
+    {
+        public T1 from { get; private set; }
+        public T2 to { get; private set; }
+
+        public LineTuple(T1 arg1, T2 arg2)
+        {
+            from = arg1;
+            to = arg2;
+        }
+    }
+    
+    void SetProofAndDisproof(Dictionary<GameObject, GameObject> node)
+    {
+        RootProof _node = _rootProofs[node];
+        if (_node.expanded)
+        {
+            if (_node.type) // if AND
+            {
+                _node.proof = 0;
+                _node.disproof = Double.MaxValue;
+                foreach (var keyValuePair in node)
+                {
+                    DrawLine(keyValuePair.Key, keyValuePair.Value);
+                    var child = PosMovesFromPoint(keyValuePair.Key);
+                    var _child =  _rootProofs[child];
+                    _node.proof += _child.proof;
+                    _node.disproof = min(_node.disproof, _child.disproof);
+                    PopLine();
+                }
+            }
+
+            if (!_node.type) // if OR
+            {
+                _node.proof = Double.MaxValue;
+                _node.disproof = 0;
+                foreach (var keyValuePair in node)
+                {
+                    DrawLine(keyValuePair.Key, keyValuePair.Value);
+                    var child = PosMovesFromPoint(keyValuePair.Key);
+                    var _child = _rootProofs[child];
+                    _node.proof = min(_node.proof, _child.proof);
+                    _node.disproof += _child.disproof;
+                    PopLine();
+                }
+            }
+        }
+        else
+        {
+            switch (_node.value)
+            {
+                case 0:
+                    _node.proof = 0;
+                    _node.disproof = Double.MaxValue;
+                    break;
+                case 1:
+                    _node.proof = Double.MaxValue;
+                    _node.disproof = 0;
+                    break;
+                case 2:
+                    _node.proof = 1;
+                    _node.disproof = 1;
+                    break;
+            }
+        }
+        _rootProofs[node] = _node;
+    }
+
+    void Evaluate(Dictionary<GameObject, GameObject> node)
+    {
+        _rootProofs[node].value = _Evaluate(node);
+    }
+    
+    int _Evaluate(Dictionary<GameObject, GameObject> node)
+    {
+        
+        int totalmoves = 0;
+        foreach (var keyValuePair in node)
+        {
+            DrawLine(keyValuePair.Key, keyValuePair.Value);
+
+           totalmoves += PosMovesFromPoint(keyValuePair.Key).Count;
+
+           PopLine();
+        }
+        if (totalmoves == 0)
+        {
+            if (firstPlayerTurn)
+            {
+                return 0;
+            }
+            return 1;
+        }
+        return 2;
+    }
+
+    void ExpandNode(Dictionary<GameObject,GameObject> node)
+    {
+        RootProof _node = _rootProofs[node];
+        GenerateChildren(node);
+        foreach (var keyValuePair in node)
+        {
+            DrawLine(keyValuePair.Key, keyValuePair.Value);
+            Dictionary<GameObject, GameObject> child = new Dictionary<GameObject, GameObject>(PosMovesFromPoint(keyValuePair.Key));
+            Evaluate(child);
+            SetProofAndDisproof(child);
+            RootProof _child = _rootProofs[child];
+            if (_node.type)
+                if (_child.disproof == 0)
+                {
+                    break;
+                }
+            if(!_node.type)
+                if (_child.proof==0)
+                {
+                    break;
+                }
+            PopLine();
+        }
+
+        _rootProofs[node].expanded = true;
+    }
+
+    bool CompareDictionaries<T1, T2>(Dictionary<T1, T2> x1,Dictionary<T1, T2> x2)
+    {
+        return (x2 ?? new Dictionary<T1, T2>())
+            .OrderBy(kvp => kvp.Key)
+            .SequenceEqual((x1 ?? new Dictionary<T1, T2>())
+                .OrderBy(kvp => kvp.Key));
+    }
+    
+    Dictionary<GameObject, GameObject> UpdateAncestors(Dictionary<GameObject, GameObject> node,
+        Dictionary<GameObject, GameObject> root)
+    {
+        while (!CompareDictionaries(root, node))
+        {
+            RootProof _node = _rootProofs[node];
+            double oldProof = _node.proof;
+            double oldDisproof = _node.disproof;
+            SetProofAndDisproof(node);
+            if (_node.proof == oldProof && _node.disproof == oldDisproof)
+                return node;
+            node = _node.parent;
+        }
+        SetProofAndDisproof(root);
+        return root;
+    }
+    
+    void GenerateChildren(Dictionary<GameObject, GameObject> node)
+
+    {
+        bool nodetype = _rootProofs[node].type;
+        foreach (var keyValuePair in node)
+        {
+            DrawLine(keyValuePair.Key, keyValuePair.Value);
+            RootProof child = new RootProof();
+            child.type = !nodetype;
+            child.parent = node;
+            _rootProofs.Add(PosMovesFromPoint(keyValuePair.Key),child);
+            PopLine();   
+        }
+    }
+
+    Dictionary<GameObject, GameObject> SelectMostProvingNode(Dictionary<GameObject, GameObject> node)
+    {
+        RootProof pair = _rootProofs[node];
+        while (pair.expanded)
+        {
+            double value = Double.MaxValue;
+            Dictionary<GameObject, GameObject> best=new Dictionary<GameObject, GameObject>(node);
+            if (pair.type)
+            {
+                foreach (var keyValuePair in node)
+                {
+                    DrawLine(keyValuePair.Key, keyValuePair.Value);
+                    var child = PosMovesFromPoint(keyValuePair.Key);
+                    var _child =
+                        _rootProofs[child];
+                    
+
+                    if (value > _child.disproof)
+                    {
+                        best = child;
+                        value = _child.disproof;
+                    }
+                    PopLine();
+                }
+
+            }
+
+            if (!pair.type)
+            {
+                foreach (var keyValuePair in node)
+                {
+                    
+                    DrawLine(keyValuePair.Key, keyValuePair.Value);
+                    var child = PosMovesFromPoint(keyValuePair.Key);
+                    var _child =
+                        _rootProofs[child];
+                    
+
+                    DrawLine(keyValuePair.Key, keyValuePair.Value);
+                    if (value > _child.proof)
+                    {
+                        best = child;
+                        value = _child.proof;
+                    }
+                    PopLine();
+                }
+
+            }
+
+            node = best;
+        }
+        
+        
+        return node;
+    }
+    
+    public class RootProof
+    {
+        public double proof, disproof;
+        public bool expanded, 
+            type; // 0 = OR, 1 = AND
+        public int value; // 0 = win, 1 = lose, 2 = unknown
+        public Dictionary<GameObject, GameObject> parent;
+
+        public RootProof()
+        {
+            this.type = false;
+            this.expanded = false;
+            this.value = 2;
+        }
+    }
+    private Dictionary<Dictionary<GameObject, GameObject>, RootProof> _rootProofs  = new
+        Dictionary<Dictionary<GameObject, GameObject>, RootProof>();
+    
+    void PNS(Dictionary<GameObject, GameObject> root)
+    {
+        _rootProofs.Add(root, new RootProof());
+        
+        Evaluate(root);
+        SetProofAndDisproof(root);
+        Dictionary<GameObject, GameObject> current = root;
+        while (_rootProofs[root].proof != 0 && _rootProofs[root].disproof != 0)
+        {
+            Dictionary<GameObject,GameObject> mostProving = SelectMostProvingNode(current);
+            ExpandNode(mostProving);
+            current = UpdateAncestors(mostProving, root);
+        }
+    }
+    
     private double minimax(Dictionary<GameObject, GameObject> node, int depth, bool maximizingPlayer)
     {
         if (node.Count == 0) return TerminalNode(maximizingPlayer);
