@@ -7,16 +7,17 @@ using UnityEditor.UIElements;
 using UnityEngine;
 using Random = UnityEngine.Random;
 using Rand = System.Random;
+
 public class GameScripts : MonoBehaviour
 {
     private readonly int depth = 0;
     private readonly List<string> lines = new List<string>();
 
-    private uint[] zobristKey = new uint[10*7];
+    private uint[] zobristKey = new uint[10 * 7];
     private uint zHash;
-    
-    
-    
+
+
+
     private bool doDrugieSetup = true;
     private int drewCount;
     private bool firstPlayerTurn = true;
@@ -54,6 +55,7 @@ public class GameScripts : MonoBehaviour
     Rand rand = new Rand();
 
     private Dictionary<uint, double> hashboards = new Dictionary<uint, double>();
+
     private uint Hashboard()
     {
         uint result = 0;
@@ -62,7 +64,7 @@ public class GameScripts : MonoBehaviour
             // if occupied
             result ^= zobristKey[i * 7];
         }
-        
+
         foreach (var o in pointsArr)
         {
             foreach (var m in pointsArr)
@@ -75,7 +77,7 @@ public class GameScripts : MonoBehaviour
                     {
                         if (parsedO == 9)
                         {
-                            result ^= zobristKey[parsedO * 7 + parsedM-1];
+                            result ^= zobristKey[parsedO * 7 + parsedM - 1];
                         }
                         else
                         {
@@ -86,12 +88,12 @@ public class GameScripts : MonoBehaviour
                     {
                         if (parsedO == 0)
                         {
-                            result ^= zobristKey[parsedO * 7 + parsedM-2  ];
-                            
+                            result ^= zobristKey[parsedO * 7 + parsedM - 2];
+
                         }
                         else
                         {
-                            result ^= zobristKey[parsedO * 7 + parsedM-3  ];
+                            result ^= zobristKey[parsedO * 7 + parsedM - 3];
                         }
                     }
                 }
@@ -102,15 +104,16 @@ public class GameScripts : MonoBehaviour
 
         return result;
     }
-    
+
     public uint GetRandomUInt()
     {
         var buffer = new byte[sizeof(uint)];
         rand.NextBytes(buffer);
         return BitConverter.ToUInt32(buffer, 0);
     }
+
     private void Start()
-    
+
     {
         loopCount = loopCounter;
         validTurn = true;
@@ -496,8 +499,8 @@ public class GameScripts : MonoBehaviour
     }
 
 
-    
-    
+
+
     public class LineTuple<T1, T2>
     {
         public T1 from { get; private set; }
@@ -509,7 +512,7 @@ public class GameScripts : MonoBehaviour
             to = arg2;
         }
     }
-    
+
     void SetProofAndDisproof(Dictionary<GameObject, GameObject> node)
     {
         RootProof _node = _rootProofs[node];
@@ -523,7 +526,7 @@ public class GameScripts : MonoBehaviour
                 {
                     DrawLine(keyValuePair.Key, keyValuePair.Value);
                     var child = PosMovesFromPoint(keyValuePair.Key);
-                    var _child =  _rootProofs[child];
+                    var _child = _rootProofs[child];
                     _node.proof += _child.proof;
                     _node.disproof = min(_node.disproof, _child.disproof);
                     PopLine();
@@ -563,6 +566,7 @@ public class GameScripts : MonoBehaviour
                     break;
             }
         }
+
         _rootProofs[node] = _node;
     }
 
@@ -570,38 +574,42 @@ public class GameScripts : MonoBehaviour
     {
         _rootProofs[node].value = _Evaluate(node);
     }
-    
+
     int _Evaluate(Dictionary<GameObject, GameObject> node)
     {
-        
+
         int totalmoves = 0;
         foreach (var keyValuePair in node)
         {
             DrawLine(keyValuePair.Key, keyValuePair.Value);
 
-           totalmoves += PosMovesFromPoint(keyValuePair.Key).Count;
+            totalmoves += PosMovesFromPoint(keyValuePair.Key).Count;
 
-           PopLine();
+            PopLine();
         }
+
         if (totalmoves == 0)
         {
             if (firstPlayerTurn)
             {
                 return 0;
             }
+
             return 1;
         }
+
         return 2;
     }
 
-    void ExpandNode(Dictionary<GameObject,GameObject> node)
+    void ExpandNode(Dictionary<GameObject, GameObject> node)
     {
         RootProof _node = _rootProofs[node];
         GenerateChildren(node);
         foreach (var keyValuePair in node)
         {
             DrawLine(keyValuePair.Key, keyValuePair.Value);
-            Dictionary<GameObject, GameObject> child = new Dictionary<GameObject, GameObject>(PosMovesFromPoint(keyValuePair.Key));
+            Dictionary<GameObject, GameObject> child =
+                new Dictionary<GameObject, GameObject>(PosMovesFromPoint(keyValuePair.Key));
             Evaluate(child);
             SetProofAndDisproof(child);
             RootProof _child = _rootProofs[child];
@@ -610,25 +618,27 @@ public class GameScripts : MonoBehaviour
                 {
                     break;
                 }
-            if(!_node.type)
-                if (_child.proof==0)
+
+            if (!_node.type)
+                if (_child.proof == 0)
                 {
                     break;
                 }
+
             PopLine();
         }
 
         _rootProofs[node].expanded = true;
     }
 
-    bool CompareDictionaries<T1, T2>(Dictionary<T1, T2> x1,Dictionary<T1, T2> x2)
+    bool CompareDictionaries<T1, T2>(Dictionary<T1, T2> x1, Dictionary<T1, T2> x2)
     {
         return (x2 ?? new Dictionary<T1, T2>())
             .OrderBy(kvp => kvp.Key)
             .SequenceEqual((x1 ?? new Dictionary<T1, T2>())
                 .OrderBy(kvp => kvp.Key));
     }
-    
+
     Dictionary<GameObject, GameObject> UpdateAncestors(Dictionary<GameObject, GameObject> node,
         Dictionary<GameObject, GameObject> root)
     {
@@ -642,10 +652,11 @@ public class GameScripts : MonoBehaviour
                 return node;
             node = _node.parent;
         }
+
         SetProofAndDisproof(root);
         return root;
     }
-    
+
     void GenerateChildren(Dictionary<GameObject, GameObject> node)
 
     {
@@ -656,8 +667,8 @@ public class GameScripts : MonoBehaviour
             RootProof child = new RootProof();
             child.type = !nodetype;
             child.parent = node;
-            _rootProofs.Add(PosMovesFromPoint(keyValuePair.Key),child);
-            PopLine();   
+            _rootProofs.Add(PosMovesFromPoint(keyValuePair.Key), child);
+            PopLine();
         }
     }
 
@@ -667,7 +678,7 @@ public class GameScripts : MonoBehaviour
         while (pair.expanded)
         {
             double value = Double.MaxValue;
-            Dictionary<GameObject, GameObject> best=new Dictionary<GameObject, GameObject>(node);
+            Dictionary<GameObject, GameObject> best = new Dictionary<GameObject, GameObject>(node);
             if (pair.type)
             {
                 foreach (var keyValuePair in node)
@@ -676,13 +687,14 @@ public class GameScripts : MonoBehaviour
                     var child = PosMovesFromPoint(keyValuePair.Key);
                     var _child =
                         _rootProofs[child];
-                    
+
 
                     if (value > _child.disproof)
                     {
                         best = child;
                         value = _child.disproof;
                     }
+
                     PopLine();
                 }
 
@@ -692,12 +704,12 @@ public class GameScripts : MonoBehaviour
             {
                 foreach (var keyValuePair in node)
                 {
-                    
+
                     DrawLine(keyValuePair.Key, keyValuePair.Value);
                     var child = PosMovesFromPoint(keyValuePair.Key);
                     var _child =
                         _rootProofs[child];
-                    
+
 
                     DrawLine(keyValuePair.Key, keyValuePair.Value);
                     if (value > _child.proof)
@@ -705,6 +717,7 @@ public class GameScripts : MonoBehaviour
                         best = child;
                         value = _child.proof;
                     }
+
                     PopLine();
                 }
 
@@ -712,11 +725,81 @@ public class GameScripts : MonoBehaviour
 
             node = best;
         }
-        
-        
+
+
         return node;
     }
-    
+
+    bool IsNoMoreMoves(Dictionary<GameObject, GameObject> node)
+    {
+        foreach (var keyValuePair in node)
+        {
+            DrawLine(keyValuePair.Key, keyValuePair.Value);
+            if (PosMovesFromPoint(keyValuePair.Key).Count > 0)
+            {
+                PopLine();
+                return false;
+            }
+           PopLine(); 
+        }
+        return true;
+    }
+
+    Dictionary<GameObject, GameObject> RandomMoveNode(Dictionary<GameObject, GameObject> node)
+    {
+        
+        System.Random random = new System.Random();
+        List<GameObject> keys = new List<GameObject>(node.Keys);
+        GameObject randomPoint = keys[random.Next(keys.Count)];
+        DrawLine(randomPoint, node[randomPoint]);
+
+        return PosMovesFromPoint(randomPoint);
+
+
+    }
+
+Dictionary<GameObject, GameObject> MonteCarloEvaluation(Dictionary<GameObject, GameObject> node, int nofSimulations)
+    {
+        Dictionary<GameObject, GameObject> bestChild = null;
+        double bestProbability = -1;
+        foreach (var keyValuePair in node)
+        {
+            DrawLine(keyValuePair.Key, keyValuePair.Value);
+            Dictionary<GameObject, GameObject> child = PosMovesFromPoint(keyValuePair.Key);
+            int r = 0;
+            for (int i = 1; i < nofSimulations; i++)
+            {
+                var _child = child;
+                int popcnt = 0;
+                while (!IsNoMoreMoves(_child))
+                {
+                    _child = RandomMoveNode(_child);
+                    popcnt++;
+                }
+
+                while (popcnt-->0)
+                {
+                    PopLine();
+                }
+
+                if (!firstPlayerTurn)
+                {
+                    r++;
+                }
+            }
+            
+            double probability = r / nofSimulations;
+            if (probability > bestProbability)
+            {
+                bestChild = child;
+                bestProbability = probability;
+            }
+            PopLine();
+        }
+        return bestChild;
+    }
+
+
     public class RootProof
     {
         public double proof, disproof;
