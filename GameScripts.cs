@@ -601,7 +601,7 @@ public class GameScripts : MonoBehaviour
         return 2;
     }
 
-    void ExpandNode(Dictionary<GameObject, GameObject> node)
+    Dictionary<GameObject, GameObject> ExpandNode(Dictionary<GameObject, GameObject> node)
     {
         RootProof _node = _rootProofs[node];
         GenerateChildren(node);
@@ -629,6 +629,7 @@ public class GameScripts : MonoBehaviour
         }
 
         _rootProofs[node].expanded = true;
+        return node;
     }
 
     bool CompareDictionaries<T1, T2>(Dictionary<T1, T2> x1, Dictionary<T1, T2> x2)
@@ -758,7 +759,128 @@ public class GameScripts : MonoBehaviour
 
     }
 
-Dictionary<GameObject, GameObject> MonteCarloEvaluation(Dictionary<GameObject, GameObject> node, int nofSimulations)
+    private int resource_counter = 1000;
+    bool ResourcesAvailable()
+    {
+        return
+            resource_counter-- > 0;
+    }
+
+    private int reward = 0;
+    
+    void UCTSearch(Dictionary<GameObject, GameObject> root)
+    {
+        resource_counter = 1000;
+        Dictionary<GameObject, GameObject> current = root;
+        while (ResourcesAvailable())
+        {
+            current = TreePolicy(current);
+            reward = DefaultPolicy(current);
+            Backup(current, reward);
+        }
+
+    }
+
+
+
+    Dictionary<GameObject, GameObject> Expand(Dictionary<GameObject, GameObject> node)
+    {
+        
+        RootProof _node = _rootProofs[node];
+        GenerateChildren(node);
+        
+        foreach (var keyValuePair in node)
+        {
+            DrawLine(keyValuePair.Key, keyValuePair.Value);
+            Dictionary<GameObject, GameObject> child =
+                new Dictionary<GameObject, GameObject>(PosMovesFromPoint(keyValuePair.Key));
+            
+            
+
+            PopLine();
+        }
+
+
+        do
+        {
+            Dictionary<GameObject, GameObject> randNode = RandomMoveNode(node);
+            PopLine();
+
+        } while (!_rootProofs[node].expanded);
+        _rootProofs[node].expanded = true;
+        return node;
+    }
+
+    int DefaultPolicy(Dictionary<GameObject, GameObject> node)
+    {
+        Dictionary<GameObject, GameObject> a = node;
+        while (!IsNoMoreMoves(node))
+        {
+            a=  RandomMoveNode(node);
+            PopLine();
+        }
+
+        return reward;
+    }
+    
+    Dictionary<GameObject, GameObject> TreePolicy(Dictionary<GameObject, GameObject> node)
+    {
+        while (!IsNoMoreMoves(node))
+        {
+            if (!_rootProofs[node].expanded)
+            {
+                return Expand(node);
+            }
+            else
+            {
+                node = BestChild(node);
+            }
+        }
+
+        return node;
+    }
+
+    void Backup(Dictionary<GameObject, GameObject> node, int reward)
+    {
+
+        while (node != null)
+        {
+            RootProof _node = _rootProofs[node];
+            _node.n++;
+            _node.value += reward;
+            node = _node.parent;
+            _node = _rootProofs[_node.parent];
+            reward = 1 - reward;
+        }
+    } 
+    private double c = 1;
+    Dictionary<GameObject, GameObject> BestChild(Dictionary<GameObject, GameObject> node)
+    {
+        Dictionary<GameObject, GameObject> best = node;
+        double value = Double.MinValue;
+        foreach (var keyValuePair in node)
+        {
+            DrawLine(keyValuePair.Key, keyValuePair.Value);
+            Dictionary<GameObject, GameObject> child = PosMovesFromPoint(keyValuePair.Key);
+            RootProof _node = _rootProofs[child];
+
+            double childValue = _node.value / _node.n+c * Mathf.Sqrt(Mathf.Log10(_rootProofs[ _node.parent].n) / _node.n);
+
+            if (childValue > value)
+            {
+                best = child;
+                value = childValue;
+            }
+            
+            PopLine();
+        }
+
+        return best;
+    }
+    
+
+
+    Dictionary<GameObject, GameObject> MonteCarloEvaluation(Dictionary<GameObject, GameObject> node, int nofSimulations)
     {
         Dictionary<GameObject, GameObject> bestChild = null;
         double bestProbability = -1;
@@ -805,14 +927,15 @@ Dictionary<GameObject, GameObject> MonteCarloEvaluation(Dictionary<GameObject, G
         public double proof, disproof;
         public bool expanded, 
             type; // 0 = OR, 1 = AND
-        public int value; // 0 = win, 1 = lose, 2 = unknown
+        public int value, // 0 = win, 1 = lose, 2 = unknown
+            n; 
         public Dictionary<GameObject, GameObject> parent;
 
         public RootProof()
         {
             this.type = false;
-            this.expanded = false;
             this.value = 2;
+            this.n = 0;
         }
     }
     private Dictionary<Dictionary<GameObject, GameObject>, RootProof> _rootProofs  = new
